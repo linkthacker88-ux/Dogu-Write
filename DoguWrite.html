@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dogu Write</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Poppins font for the new logo and menu -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* CSS Custom Properties and Global Styles */
+        body {
+            background-color: white;
+            /* Use a column flex layout for the body: Topbar on top, Main Content below */
+            display: flex;
+            flex-direction: column;
+            /* The overall page height is fixed to the viewport height, preventing global scrolling */
+            height: 100vh;
+            overflow: hidden; 
+        }
+        .font-arial {
+            font-family: Arial, sans-serif;
+        }
+
+        /* Set Poppins for the menu and logo for consistency */
+        #saveDropdownButton, .poppins-text {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        /* Styling for the contenteditable placeholder */
+        [contenteditable="true"]:empty::before {
+            content: 'Start typing here...';
+            color: #71717A;
+            opacity: 0.5;
+        }
+        /* Style for the scrollable list of fonts */
+        .more-fonts-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        /* Ensure dropdown opens on hover in the topbar */
+        #fileDropdownMenu.group-hover\\:block {
+            display: none;
+        }
+        .group:hover #fileDropdownMenu {
+            display: block;
+        }
+        .group\\/save:hover .absolute {
+            display: block;
+        }
+        .group\\/save .absolute {
+            display: none;
+        }
+
+        /* Editor Base Styling with Spacing Custom Properties */
+        .editor-style {
+            /* Define custom properties for spacing */
+            --line-spacing: 1.5;
+            --word-spacing: 0px;
+            --character-spacing: 0px;
+
+            /* Apply them to the editor */
+            line-height: var(--line-spacing);
+            word-spacing: var(--word-spacing);
+            letter-spacing: var(--character-spacing);
+        }
+    </style>
+</head>
+<body class="bg-white">
+
+    <!-- Notification/Message Box (Replaces alert()) -->
+    <div id="messageBox" class="fixed top-20 right-6 p-4 bg-green-500 text-white rounded-lg shadow-xl z-50 hidden transition-opacity duration-300 opacity-0"></div>
+
+    <!-- Document Selection Modal for Mock Loading -->
+    <div id="loadModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-2xl w-96 poppins-text">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Load from Dogu Workplace</h2>
+            <!-- Displaying the mock user/subuser IDs as requested -->
+            <p class="text-sm mb-4 text-gray-600">
+                User: <span id="displayUserId" class="font-mono text-blue-600 font-semibold text-xs"></span><br>
+                Workspace: <span id="displaySubuserId" class="font-mono text-blue-600 font-semibold text-xs"></span>
+            </p>
+            <div id="documentList" class="space-y-2 max-h-60 overflow-y-auto border p-3 rounded-md bg-gray-50">
+                <!-- Documents will be loaded here -->
+            </div>
+            <div class="flex justify-end mt-6 space-x-3">
+                <button id="cancelLoad" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 font-medium transition-colors">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Bar h-16 with Logo and Dropdown Menu -->
+    <div class="w-full h-16 bg-blue-500 shadow-md flex items-center justify-between px-6">
+        <!-- Left Side: Logo (Changed to Dogu Write) -->
+        <div class="flex items-center bg-blue-700 p-1.5 rounded-lg shadow-lg">
+            <h1 style="font-family: 'Poppins', sans-serif;" class="text-lg text-white font-extrabold px-1">Dogu Write</h1>
+        </div>
+
+        <!-- Right Side: Save/Load Dropdown -->
+        <div class="relative group poppins-text">
+            <button class="flex items-center px-4 py-2 bg-blue-700 text-white font-semibold rounded-md shadow-lg hover:bg-blue-800 focus:outline-none" id="saveDropdownButton">
+                File
+                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            
+            <!-- Dropdown Menu Content -->
+            <div id="fileDropdownMenu" class="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-xl z-20 hidden">
+                <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="saveDropdownButton">
+                    
+                    <span class="block px-4 py-2 text-xs font-semibold text-gray-400 border-b">Save & Export</span>
+                    <div id="saveOptions">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-action="save-online">Save to Dogu Workplace</a>
+                        <!-- Save to Computer Sub-menu -->
+                        <div class="relative group/save">
+                            <button class="flex justify-between items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-action="save-local-menu">
+                                Save to Computer
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            </button>
+                            <!-- Export Sub-options (Hidden by default, shown on group-hover/save) -->
+                            <div class="absolute left-full top-0 ml-1 w-40 bg-white rounded-md shadow-xl z-30">
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-action="save-local" data-ext="txt">.txt</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-action="save-local" data-ext="md">.md</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-action="save-local" data-ext="html">.html (Source)</a>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-action="save-local" data-ext="pdf">.pdf (Mock)</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <span class="block px-4 py-2 text-xs font-semibold text-gray-400 border-y mt-1">Load & Import</span>
+                    <div id="loadOptions">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-action="load-online">Load from Dogu Workplace</a>
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-action="load-local">Load from Computer (.txt, .md, .html)</a>
+                        <!-- Hidden file input to trigger file selection -->
+                        <input type="file" id="fileInput" accept=".txt,.md,.html" class="hidden">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area (Sidebar + Editor Area) - Takes up remaining vertical space -->
+    <div class="flex flex-grow overflow-hidden">
+
+        <!-- The light gray sidebar on the left -->
+        <div class="w-80 bg-gray-100 h-full overflow-y-auto p-6 space-y-4 relative">
+            
+            <!-- Select Font -->
+            <p class="text-sm font-semibold text-gray-700">Select Font</p>
+            <select id="fontSelector" class="w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                <!-- Default fonts that are always available -->
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Times New Roman, serif">Times New Roman</option>
+                <option value="Courier New, monospace">Courier New</option>
+                <option value="Verdana, sans-serif">Verdana</option>
+                <option value="Tahoma, sans-serif">Tahoma</option>
+                <option value="Trebuchet MS, sans-serif">Trebuchet MS</option>
+                <option value="Garamond, serif">Garamond</option>
+                <option value="Palatino, serif">Palatino</option>
+                <option value="Lucida Console, monospace">Lucida Console</option>
+                <option value="Impact, sans-serif">Impact</option>
+                <option value="Comic Sans MS, cursive">Comic Sans MS</option>
+                <!-- Option to show more fonts -->
+                <option value="more-fonts">More Fonts...</option>
+            </select>
+            
+            <!-- More Fonts modal/section -->
+            <div id="moreFontsContainer" class="absolute top-0 left-full ml-4 p-4 w-64 bg-gray-50 rounded-lg shadow-xl border border-gray-200 z-10 hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <p class="text-sm font-semibold text-gray-700">Add/Remove Fonts</p>
+                    <button id="closeMoreFonts" class="text-gray-400 hover:text-gray-600 focus:outline-none">&times;</button>
+                </div>
+                <div id="moreFontsList" class="more-fonts-list space-y-2 text-sm">
+                    <!-- Font checkboxes will be dynamically added here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Horizontal separator -->
+            <hr class="my-4 border-t border-gray-300">
+
+            <!-- Font Size Selector -->
+            <p class="text-sm font-semibold text-gray-700">Font Size</p>
+            <select id="fontSizeSelector" class="w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                <option value="12">12px</option>
+                <option value="14">14px</option>
+                <option value="16" selected>16px</option>
+                <option value="18">18px</option>
+                <option value="20">20px</option>
+                <option value="24">24px</option>
+                <option value="30">30px</option>
+                <option value="36">36px</option>
+                <option value="48">48px</option>
+                <option value="64">64px</option>
+                <option value="72">72px</option>
+            </select>
+
+            <!-- Horizontal separator -->
+            <hr class="my-4 border-t border-gray-300">
+
+            <!-- Text Color Selector -->
+            <p class="text-sm font-semibold text-gray-700">Text Color</p>
+            <div class="flex items-center space-x-2">
+                <input type="color" id="colorSelector" value="#000000" class="h-8 w-8 rounded-md border-0 p-0 shadow-sm cursor-pointer">
+                <span id="colorValue" class="text-sm font-medium text-gray-700">#000000</span>
+            </div>
+
+            <!-- Horizontal separator -->
+            <hr class="my-4 border-t border-gray-300">
+
+            <!-- Formatting Tools (B/I/U/S/Sup/Sub) -->
+            <p class="text-sm font-semibold text-gray-700">Formatting</p>
+            <div id="formatTools" class="flex flex-wrap gap-2">
+                <!-- Format buttons will be dynamically added here by JavaScript -->
+            </div>
+
+            <!-- Horizontal separator -->
+            <hr class="my-4 border-t border-gray-300">
+
+            <!-- Lists & Alignment -->
+            <p class="text-sm font-semibold text-gray-700">Lists & Alignment</p>
+            <div id="listAndAlignTools" class="flex flex-wrap gap-2">
+                <!-- Alignment Buttons -->
+                <button data-command="justifyLeft" title="Align Left" class="format-btn p-2 border rounded-md shadow-sm bg-white hover:bg-indigo-50 text-gray-700 border-gray-300">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 5h16v2H2zm0 4h16v2H2zm0 4h10v2H2z"/></svg>
+                </button>
+                <button data-command="justifyCenter" title="Align Center" class="format-btn p-2 border rounded-md shadow-sm bg-white hover:bg-indigo-50 text-gray-700 border-gray-300">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 5h16v2H2zm0 4h16v2H2zm5 4h6v2H7z"/></svg>
+                </button>
+                <button data-command="justifyRight" title="Align Right" class="format-btn p-2 border rounded-md shadow-sm bg-white hover:bg-indigo-50 text-gray-700 border-gray-300">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 5h16v2H2zm0 4h16v2H2zm8 4h8v2h-8z"/></svg>
+                </button>
+                <button data-command="justifyFull" title="Justify" class="format-btn p-2 border rounded-md shadow-sm bg-white hover:bg-indigo-50 text-gray-700 border-gray-300">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 5h16v2H2zm0 4h16v2H2zm0 4h16v2H2z"/></svg>
+                </button>
+                <!-- List Buttons -->
+                <button data-command="insertUnorderedList" title="Bullet List" class="format-btn p-2 border rounded-md shadow-sm bg-white hover:bg-indigo-50 text-gray-700 border-gray-300">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4h12v2H4zm0 6h12v2H4zm0 6h12v2H4zM2 4a1 1 0 100 2 1 1 0 000-2zM2 10a1 1 0 100 2 1 1 0 000-2zM2 16a1 1 0 100 2 1 1 0 000-2z"/></svg>
+                </button>
+                <button data-command="insertOrderedList" title="Numbered List" class="format-btn p-2 border rounded-md shadow-sm bg-white hover:bg-indigo-50 text-gray-700 border-gray-300">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4h12v2H4zm0 6h12v2H4zm0 6h12v2H4zM2 4a1 1 0 100 2 1 1 0 000-2zM2 10a1 1 0 100 2 1 1 0 000-2zM2 16a1 1 0 100 2 1 1 0 000-2z"/></svg>
+                </button>
+            </div>
+
+            <!-- Spacing Controls -->
+            <hr class="my-4 border-t border-gray-300">
+            <p class="text-sm font-semibold text-gray-700">Spacing</p>
+            <div class="space-y-3">
+                <!-- Line Spacing -->
+                <div>
+                    <label for="lineSpacing" class="block text-xs font-medium text-gray-600">Line Spacing (Multiplier)</label>
+                    <input type="number" id="lineSpacing" min="1" max="5" step="0.1" value="1.5" class="w-full p-2 rounded-md border-gray-300 shadow-sm">
+                </div>
+                <!-- Word Spacing -->
+                <div>
+                    <label for="wordSpacing" class="block text-xs font-medium text-gray-600">Word Spacing (px)</label>
+                    <input type="number" id="wordSpacing" min="0" max="100" step="1" value="0" class="w-full p-2 rounded-md border-gray-300 shadow-sm">
+                </div>
+                <!-- Character Spacing -->
+                <div>
+                    <label for="charSpacing" class="block text-xs font-medium text-gray-600">Character Spacing (px)</label>
+                    <input type="number" id="charSpacing" min="0" max="10" step="0.1" value="0" class="w-full p-2 rounded-md border-gray-300 shadow-sm">
+                </div>
+            </div>
+
+            <!-- Links & Media -->
+            <hr class="my-4 border-t border-gray-300">
+            <p class="text-sm font-semibold text-gray-700">Links & Media</p>
+            <div class="flex flex-wrap gap-2">
+                <button id="insertLinkBtn" title="Insert Link" class="p-2 border rounded-md shadow-sm bg-white hover:bg-indigo-50 text-gray-700 border-gray-300">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5.656 5.656a2 2 0 010 2.828l-3 3a2 2 0 11-2.828-2.828l3-3a2 2 0 012.828 0 1 1 0 001.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5z" clip-rule="evenodd"/></svg>
+                </button>
+                <button id="insertMediaBtn" title="Insert Image/Video Placeholder" class="p-2 border rounded-md shadow-sm bg-white hover:bg-indigo-50 text-gray-700 border-gray-300">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 4-4z" clip-rule="evenodd"/></svg>
+                </button>
+            </div>
+
+            <!-- Horizontal separator -->
+            <hr class="my-4 border-t border-gray-300">
+
+            <!-- Presets Section -->
+            <p class="text-sm font-semibold text-gray-700">Presets</p>
+            <div id="presetContainer" class="flex flex-col space-y-2">
+                <!-- Preset buttons will be dynamically added here by JavaScript -->
+            </div>
+
+        </div>
+
+        <!-- The main content area that holds the editable square -->
+        <!-- Added editor-style class for CSS variable application -->
+        <div class="flex-grow flex flex-col items-center overflow-y-auto">
+            <div id="editor" contenteditable="true" class="w-[40vw] h-[80vw] my-12 bg-white rounded-lg shadow-2xl p-8 font-arial focus:outline-none editor-style"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Mock User/Subuser Setup (Simple alternative to real auth/backend) ---
+        // These IDs are used to scope the local storage keys, simulating user accounts and workspaces.
+        const MOCK_USER_ID = 'user_johndoe'; 
+        const MOCK_SUBUSER_ID = 'project_alpha';
+        const LS_INDEX_KEY = `dogu_index_${MOCK_USER_ID}_${MOCK_SUBUSER_ID}`;
+        // --- End Mock Setup ---
+        
+        // --- DOM Elements ---
+        const fontSelector = document.getElementById('fontSelector');
+        const fontSizeSelector = document.getElementById('fontSizeSelector');
+        const colorSelector = document.getElementById('colorSelector');
+        const colorValueSpan = document.getElementById('colorValue');
+        const editor = document.getElementById('editor');
+        const moreFontsContainer = document.getElementById('moreFontsContainer');
+        const moreFontsList = document.getElementById('moreFontsList');
+        const closeMoreFontsButton = document.getElementById('closeMoreFonts');
+        const presetContainer = document.getElementById('presetContainer');
+        const formatTools = document.getElementById('formatTools');
+        const fileInput = document.getElementById('fileInput');
+        const messageBox = document.getElementById('messageBox');
+        const saveDropdownButton = document.getElementById('saveDropdownButton');
+        const fileDropdownMenu = document.getElementById('fileDropdownMenu');
+        
+        // New Spacing and Media Elements
+        const lineSpacingInput = document.getElementById('lineSpacing');
+        const wordSpacingInput = document.getElementById('wordSpacing');
+        const charSpacingInput = document.getElementById('charSpacing');
+        const insertLinkBtn = document.getElementById('insertLinkBtn');
+        const insertMediaBtn = document.getElementById('insertMediaBtn');
+        const listAndAlignTools = document.getElementById('listAndAlignTools');
+        
+        // Modal elements
+        const loadModal = document.getElementById('loadModal');
+        const documentList = document.getElementById('documentList');
+        const cancelLoadButton = document.getElementById('cancelLoad');
+        const displayUserId = document.getElementById('displayUserId');
+        const displaySubuserId = document.getElementById('displaySubuserId');
+        
+        // Display mock IDs in the modal
+        displayUserId.textContent = MOCK_USER_ID;
+        displaySubuserId.textContent = MOCK_SUBUSER_ID;
+
+
+        const allFonts = [
+            { name: "Arial", value: "Arial, sans-serif", default: true },
+            { name: "Georgia", value: "Georgia, serif", default: true },
+            { name: "Times New Roman", value: "Times New Roman, serif", default: true },
+            { name: "Courier New", value: "Courier New, monospace", default: true },
+            { name: "Verdana", value: "Verdana, sans-serif", default: true },
+            { name: "Tahoma, sans-serif", default: true },
+            { name: "Trebuchet MS, sans-serif", default: true },
+            { name: "Garamond", value: "Garamond, serif", default: true },
+            { name: "Palatino", value: "Palatino Linotype, Book Antiqua, Palatino, serif", default: true },
+            { name: "Lucida Console", value: "Lucida Console, Monaco, monospace", default: true },
+            { name: "Impact", value: "Impact, Charcoal, sans-serif", default: true },
+            { name: "Comic Sans MS", value: "Comic Sans MS, Comic Sans, cursive", default: true },
+            { name: "Roboto", value: "Roboto, sans-serif", default: false },
+            { name: "Open Sans", value: "'Open Sans', sans-serif", default: false },
+            { name: "Lato", value: "Lato, sans-serif", default: false },
+            { name: "Montserrat", value: "Montserrat, sans-serif", default: false },
+            { name: "Oswald", value: "Oswald, sans-serif", default: false },
+            { name: "Source Sans Pro", value: "'Source Sans Pro', sans-serif", default: false },
+            { name: "Poppins", value: "Poppins, sans-serif", default: false },
+            { name: "Raleway", value: "Raleway, sans-serif", default: false },
+            { name: "Merriweather", value: "Merriweather, serif", default: false },
+            { name: "Noto Sans", value: "'Noto Sans', sans-serif", default: false },
+            { name: "Playfair Display", value: "'Playfair Display', serif", default: false },
+            { name: "Ubuntu", value: "Ubuntu, sans-serif", default: false },
+            { name: "Lora", value: "Lora, serif", default: false },
+            { name: "Cormorant Garamond", value: "'Cormorant Garamond', serif", default: false },
+            { name: "Inconsolata", value: "Inconsolata, monospace", default: false },
+            { name: "Fjalla One", value: "'Fjalla One', sans-serif", default: false },
+            { name: "Indie Flower", value: "'Indie Flower', cursive", default: false },
+            { name: "Bebas Neue", value: "'Bebas Neue', sans-serif", default: false },
+            { name: "Lobster", value: "Lobster, cursive", default: false },
+        ];
+
+        // Mapping from pixel value to the `document.execCommand` size value (1-7)
+        const sizeMap = {
+            '12': '1', '14': '2', '16': '3', '18': '4', '20': '4', '24': '5', '30': '5',
+            '36': '6', '48': '7', '64': '7', '72': '7'
+        };
+
+        const presets = [
+            { name: "Title", fontSize: '48', bold: true, italic: false, underline: false },
+            { name: "Heading 1", fontSize: '36', bold: true, italic: false, underline: false },
+            { name: "Heading 2", fontSize: '24', bold: true, italic: false, underline: false },
+            { name: "Heading 3", fontSize: '18', bold: true, italic: false, underline: false },
+            { name: "Paragraph", fontSize: '16', bold: false, italic: false, underline: false },
+            { name: "Subtitle", fontSize: '14', bold: false, italic: true, underline: false },
+        ];
+        
+        const formatCommands = [
+            { command: 'bold', label: 'B', title: 'Bold' },
+            { command: 'italic', label: 'I', title: 'Italic' },
+            { command: 'underline', label: 'U', title: 'Underline' },
+            { command: 'strikeThrough', label: 'S', title: 'Strikethrough' },
+            { command: 'superscript', label: 'x²', title: 'Superscript' },
+            { command: 'subscript', label: 'x₁', title: 'Subscript' },
+        ];
+
+        const alignCommands = [
+            'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull', 'insertUnorderedList', 'insertOrderedList'
+        ];
+
+        // --- Core Utility Functions ---
+
+        // Function to display an in-app message (replaces alert())
+        function showMessage(message, type = 'success', duration = 3000) {
+            messageBox.textContent = message;
+            messageBox.className = `fixed top-20 right-6 p-4 rounded-lg shadow-xl z-50 transition-opacity duration-300 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} block opacity-100`;
+
+            setTimeout(() => {
+                messageBox.classList.remove('opacity-100');
+                messageBox.classList.add('opacity-0');
+                setTimeout(() => messageBox.classList.add('hidden'), 300);
+            }, duration);
+        }
+
+        // --- Mock Online Storage Functions using localStorage ---
+
+        // Function to get the current document index array from localStorage
+        function getDocumentIndex() {
+            try {
+                const indexJson = localStorage.getItem(LS_INDEX_KEY);
+                return indexJson ? JSON.parse(indexJson) : [];
+            } catch (e) {
+                console.error("Error reading document index:", e);
+                return [];
+            }
+        }
+
+        // Function to set the document index array to localStorage
+        function setDocumentIndex(indexArray) {
+            try {
+                localStorage.setItem(LS_INDEX_KEY, JSON.stringify(indexArray));
+            } catch (e) {
+                console.error("Error saving document index:", e);
+                showMessage("Error: Could not save document index to local storage.", 'error');
+            }
+        }
+
+        function saveOnlineDocument() {
+            const index = getDocumentIndex();
+            // Assign the next sequential document number
+            const newIndex = index.length + 1;
+            const docTitle = `Document ${newIndex}`;
+            const storageKey = `dogu_doc_${MOCK_USER_ID}_${MOCK_SUBUSER_ID}_${newIndex}`;
+            const content = editor.innerHTML;
+
+            // 1. Store the document content
+            try {
+                localStorage.setItem(storageKey, content);
+            } catch (e) {
+                console.error("Error saving document content:", e);
+                showMessage("Error: Could not save document to local storage. Storage might be full.", 'error');
+                return;
+            }
+
+            // 2. Update the index with metadata
+            index.push({ 
+                id: newIndex, 
+                title: docTitle, 
+                key: storageKey, 
+                date: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })
+            });
+            setDocumentIndex(index);
+            
+            showMessage(`Saved "${docTitle}" (ID: ${MOCK_USER_ID}) to Dogu Workplace (Mock LS)!`, 'success', 5000);
+        }
+
+        function showLoadModal() {
+            const index = getDocumentIndex();
+            documentList.innerHTML = ''; // Clear previous list
+
+            if (index.length === 0) {
+                documentList.innerHTML = '<p class="text-gray-500 italic text-center py-4">No documents found for this user/workspace.</p>';
+            } else {
+                // Documents are listed using the numbered titles
+                index.forEach(doc => {
+                    const button = document.createElement('button');
+                    button.textContent = `${doc.title} - Saved ${doc.date}`;
+                    button.className = 'w-full text-left p-2 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-blue-100 transition-colors text-sm truncate shadow-sm';
+                    button.setAttribute('data-doc-key', doc.key);
+                    documentList.appendChild(button);
+                });
+            }
+
+            loadModal.classList.remove('hidden');
+        }
+
+        // --- General Editor & Sidebar Functions ---
+
+        // Function to render the list of all fonts with checkboxes
+        function renderMoreFontsList() {
+            moreFontsList.innerHTML = ''; // Clear previous list
+            allFonts.forEach(font => {
+                // Skip the default fonts to avoid duplication
+                if (font.default) return;
+
+                const isChecked = Array.from(fontSelector.options).some(option => option.value === font.value);
+                const checkboxDiv = document.createElement('div');
+                checkboxDiv.className = 'flex items-center';
+                checkboxDiv.innerHTML = `
+                    <input type="checkbox" id="font-${font.name.replace(/\s/g, '-')}" data-font="${font.value}" ${isChecked ? 'checked' : ''} class="mr-2 rounded text-indigo-500 focus:ring-indigo-500">
+                    <label for="font-${font.name.replace(/\s/g, '-')}" class="text-gray-700">${font.name}</label>
+                `;
+                moreFontsList.appendChild(checkboxDiv);
+            });
+        }
+
+        // Function to add a font to the main selector
+        function addFontToSelector(name, value) {
+            // Check if the font is not already in the list
+            if (!document.querySelector(`#fontSelector option[value="${value}"]`)) {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = name;
+                fontSelector.insertBefore(option, fontSelector.options[fontSelector.options.length - 1]);
+            }
+        }
+
+        // Function to remove a font from the main selector
+        function removeFontFromSelector(value) {
+            const optionToRemove = document.querySelector(`#fontSelector option[value="${value}"]`);
+            if (optionToRemove) {
+                optionToRemove.remove();
+            }
+        }
+        
+        // Function to render the preset buttons
+        function renderPresets() {
+            presetContainer.innerHTML = '';
+            presets.forEach((preset, index) => {
+                const button = document.createElement('button');
+                button.textContent = preset.name;
+                button.setAttribute('data-preset-index', index);
+                button.className = 'w-full p-2 text-left rounded-md border border-gray-300 shadow-sm text-sm text-gray-700 hover:bg-gray-200 focus:outline-none';
+                presetContainer.appendChild(button);
+            });
+        }
+        
+        // Function to render the core formatting buttons (B, I, U, etc.)
+        function renderFormatTools() {
+            formatTools.innerHTML = formatCommands.map(item => `
+                <button
+                    id="${item.command}Btn"
+                    data-command="${item.command}"
+                    title="${item.title}"
+                    class="format-btn p-2 text-sm font-semibold border rounded-md transition-colors shadow-sm
+                           bg-white hover:bg-indigo-50 text-gray-700 border-gray-300"
+                    style="min-width: 32px; font-style: ${item.command === 'italic' ? 'italic' : 'normal'}; text-decoration: ${item.command === 'underline' ? 'underline' : 'none'};"
+                >
+                    ${item.label}
+                </button>
+            `).join('');
+        }
+
+        // Function to update the visual state of the formatting buttons based on current selection
+        function updateFormatToolState() {
+            // Update B, I, U, S, Sup, Sub state
+            formatCommands.forEach(item => {
+                const button = document.getElementById(`${item.command}Btn`);
+                if (button) {
+                    const isActive = document.queryCommandState(item.command);
+                    if (isActive) {
+                        button.classList.remove('bg-white', 'text-gray-700', 'hover:bg-indigo-50');
+                        button.classList.add('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
+                    } else {
+                        button.classList.remove('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
+                        button.classList.add('bg-white', 'text-gray-700', 'hover:bg-indigo-50');
+                    }
+                }
+            });
+            
+            // Update Alignment and List state (they also use class 'format-btn')
+            alignCommands.forEach(command => {
+                const button = document.querySelector(`#listAndAlignTools button[data-command="${command}"]`);
+                if (button) {
+                    const isActive = document.queryCommandState(command);
+                    if (isActive) {
+                        button.classList.remove('bg-white', 'text-gray-700', 'hover:bg-indigo-50');
+                        button.classList.add('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
+                    } else {
+                        button.classList.remove('bg-indigo-500', 'text-white', 'hover:bg-indigo-600');
+                        button.classList.add('bg-white', 'text-gray-700', 'hover:bg-indigo-50');
+                    }
+                }
+            });
+        }
+        
+        // Function to handle downloading content to the user's computer
+        function saveToComputer(extension) {
+            let content;
+            let mimeType;
+            let fileName = `dogu-write-document-${Date.now()}`; // Updated filename prefix
+
+            if (extension === 'html') {
+                content = editor.innerHTML;
+                mimeType = 'text/html';
+                fileName += '.html';
+            } else if (extension === 'pdf') {
+                // Mock PDF creation. Save as a text file with a note.
+                content = "--- PDF MOCK EXPORT ---\nThis content would be formatted for PDF output.\n\n" + editor.innerText;
+                mimeType = 'text/plain';
+                fileName += '.txt';
+                showMessage("PDF export is mocked. Saved content as a text file.", 'success', 5000);
+            } else if (extension === 'md') {
+                // Simple markdown export (plain text content)
+                content = editor.innerText;
+                mimeType = 'text/markdown';
+                fileName += '.md';
+            } else { // .txt
+                content = editor.innerText;
+                mimeType = 'text/plain';
+                fileName += '.txt';
+            }
+
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            if (extension !== 'pdf') {
+                showMessage(`Exported to computer as ${fileName}!`, 'success');
+            }
+        }
+
+        // Function to handle loading content from a local file
+        function loadFromComputer(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const fileContent = e.target.result;
+                // As requested, .html files are loaded as plain text.
+                editor.innerText = fileContent;
+                
+                let message = `Loaded ${file.name} successfully!`;
+                if (file.name.endsWith('.html')) {
+                    message += " (Content loaded as plain text)";
+                }
+                showMessage(message, 'success');
+            };
+            reader.onerror = () => {
+                showMessage("Error reading file.", 'error');
+            };
+            reader.readAsText(file);
+        }
+
+        // Function to route online mock operations
+        function mockOnlineOperation(action) {
+            if (action === 'save-online') {
+                saveOnlineDocument();
+            } else if (action === 'load-online') {
+                showLoadModal();
+            }
+        }
+
+
+        // --- Event Listeners ---
+
+        // Listener for changes in text selection/cursor movement to update button state
+        editor.addEventListener('mouseup', updateFormatToolState);
+        editor.addEventListener('keyup', updateFormatToolState);
+        editor.addEventListener('focus', updateFormatToolState);
+        editor.addEventListener('blur', updateFormatToolState);
+
+
+        // Event listener for the main font selector
+        fontSelector.addEventListener('change', (event) => {
+            const selectedValue = event.target.value;
+            
+            if (selectedValue === 'more-fonts') {
+                moreFontsContainer.classList.remove('hidden');
+                renderMoreFontsList();
+                // Reset the select box to the last selected font
+                fontSelector.value = fontSelector.options[fontSelector.options.length - 2].value;
+            } else {
+                document.execCommand('fontName', false, selectedValue);
+            }
+        });
+
+        // Event listener for the "More Fonts" list checkboxes
+        moreFontsList.addEventListener('change', (event) => {
+            if (event.target.type === 'checkbox') {
+                const fontValue = event.target.dataset.font;
+                const fontName = allFonts.find(f => f.value === fontValue).name;
+
+                if (event.target.checked) {
+                    addFontToSelector(fontName, fontValue);
+                } else {
+                    removeFontFromSelector(fontValue);
+                }
+            }
+        });
+
+        // Event listener to close the "More Fonts" container
+        closeMoreFontsButton.addEventListener('click', () => {
+            moreFontsContainer.classList.add('hidden');
+        });
+
+        // Event listener for the new font size selector
+        fontSizeSelector.addEventListener('change', (event) => {
+            const selectedValue = event.target.value;
+            const execCommandValue = sizeMap[selectedValue] || '3'; // Default to a medium size if not found
+            document.execCommand('fontSize', false, execCommandValue);
+        });
+
+        // Event listener for the new color selector
+        colorSelector.addEventListener('input', (event) => {
+            const color = event.target.value;
+            colorValueSpan.textContent = color.toUpperCase();
+            document.execCommand('foreColor', false, color);
+        });
+
+        // Event listener for the formatting, alignment, and list buttons (delegated)
+        document.addEventListener('click', (event) => {
+            // Target elements with data-command that are inside the format tools or list/align tools
+            const button = event.target.closest('#formatTools .format-btn, #listAndAlignTools .format-btn');
+            if (button) {
+                const command = button.getAttribute('data-command');
+                document.execCommand(command, false, null);
+                // Update the visual state immediately
+                updateFormatToolState();
+            }
+        });
+
+        // Event listeners for Spacing Controls (applied to the entire editor via CSS variables)
+        lineSpacingInput.addEventListener('input', (event) => {
+            const value = event.target.value;
+            editor.style.setProperty('--line-spacing', value);
+        });
+
+        wordSpacingInput.addEventListener('input', (event) => {
+            const value = event.target.value + 'px';
+            editor.style.setProperty('--word-spacing', value);
+        });
+
+        charSpacingInput.addEventListener('input', (event) => {
+            const value = event.target.value + 'px';
+            editor.style.setProperty('--character-spacing', value);
+        });
+
+        // Event listener for Insert Link
+        insertLinkBtn.addEventListener('click', () => {
+            // Get selected text range
+            const selection = window.getSelection();
+            if (selection.rangeCount === 0 || selection.toString().length === 0) {
+                showMessage("Please select the text you want to link first.", 'error');
+                return;
+            }
+
+            const url = prompt("Enter the URL for the link:", "http://");
+            if (url && url !== "http://" && url.trim().length > 0) {
+                document.execCommand('createLink', false, url);
+                showMessage("Link inserted!", 'success');
+            } else {
+                showMessage("Link insertion cancelled or invalid URL.", 'error');
+            }
+        });
+
+        // Event listener for Insert Media (Placeholder)
+        insertMediaBtn.addEventListener('click', () => {
+            const result = confirm("Insert an Image (OK) or a Video placeholder (Cancel)?");
+            
+            if (result) { // Image
+                // Using a placeholder image URL
+                const html = `<div style="text-align: center; margin: 15px 0;"><img src="https://placehold.co/200x150/5084C9/FFFFFF?text=Image+Placeholder" alt="Placeholder Image" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div><p></p>`;
+                document.execCommand('insertHTML', false, html);
+                showMessage("Image placeholder inserted!", 'success');
+            } else { // Video
+                // Custom div styled like a video player
+                const html = `<div style="text-align: center; margin: 15px 0;"><div style="width: 200px; height: 150px; background-color: #C95050; color: white; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; font-family: 'Poppins', sans-serif; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">VIDEO PLACEHOLDER</div></div><p></p>`;
+                document.execCommand('insertHTML', false, html);
+                showMessage("Video placeholder inserted!", 'success');
+            }
+        });
+
+
+        // Event listener for the preset buttons
+        presetContainer.addEventListener('click', (event) => {
+            const button = event.target.closest('button');
+            if (button) {
+                const presetIndex = button.getAttribute('data-preset-index');
+                const preset = presets[presetIndex];
+
+                // Ensure styles are applied or removed based on the preset definition
+                const applyStyle = (command, shouldBeActive) => {
+                    const isActive = document.queryCommandState(command);
+                    if (shouldBeActive && !isActive) {
+                        document.execCommand(command, false, null); // Turn on
+                    } else if (!shouldBeActive && isActive) {
+                        document.execCommand(command, false, null); // Turn off (by toggling)
+                    }
+                };
+
+                applyStyle('bold', preset.bold);
+                applyStyle('italic', preset.italic);
+                applyStyle('underline', preset.underline);
+
+                // Apply the font size
+                document.execCommand('fontSize', false, sizeMap[preset.fontSize]);
+                
+                // Update button visuals
+                updateFormatToolState();
+            }
+        });
+
+        // Listener to handle the main dropdown button click for accessibility and mobile
+        saveDropdownButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            fileDropdownMenu.classList.toggle('hidden');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (event) => {
+            if (!saveDropdownButton.contains(event.target) && !fileDropdownMenu.contains(event.target) && !loadModal.contains(event.target)) {
+                fileDropdownMenu.classList.add('hidden');
+            }
+        });
+
+        // Attach listener to the whole dropdown menu for delegation
+        document.getElementById('fileDropdownMenu').addEventListener('click', (event) => {
+            const target = event.target.closest('[data-action]');
+            if (!target) return;
+            
+            event.preventDefault();
+            
+            const action = target.getAttribute('data-action');
+            
+            if (action === 'save-local') {
+                const ext = target.getAttribute('data-ext');
+                if (ext) {
+                    saveToComputer(ext);
+                    fileDropdownMenu.classList.add('hidden'); // Close dropdown after action
+                }
+            } else if (action === 'save-online' || action === 'load-online') {
+                mockOnlineOperation(action);
+                fileDropdownMenu.classList.add('hidden'); // Close dropdown after action
+            } else if (action === 'load-local') {
+                // Trigger the hidden file input click
+                fileInput.click();
+                fileDropdownMenu.classList.add('hidden'); // Close dropdown immediately
+            }
+            // Prevent dropdown from closing immediately on menu button click
+            event.stopPropagation();
+        });
+
+        // Listener for the actual file input change
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                loadFromComputer(file);
+            }
+            // Clear the file input value so the 'change' event fires again if the user selects the same file
+            event.target.value = ''; 
+        });
+        
+        // Listener for the load modal document selection
+        documentList.addEventListener('click', (event) => {
+            const button = event.target.closest('button');
+            if (button && button.getAttribute('data-doc-key')) {
+                const key = button.getAttribute('data-doc-key');
+                const content = localStorage.getItem(key);
+                
+                if (content) {
+                    editor.innerHTML = content;
+                    showMessage(`Loaded ${button.textContent.split(' ')[0]} successfully!`, 'success');
+                } else {
+                    showMessage("Error: Document content not found.", 'error');
+                }
+                
+                loadModal.classList.add('hidden');
+            }
+        });
+
+        // Listener for modal cancel button
+        cancelLoadButton.addEventListener('click', () => {
+            loadModal.classList.add('hidden');
+        });
+
+
+        // Initial setup calls
+        renderPresets();
+        renderFormatTools();
+    </script>
+</body>
+</html>
